@@ -290,6 +290,7 @@
         "signAndSendTransaction": true,
         "signAndSendTransactions": true,
         "signDelegateActions": true,
+        "signInWithFunctionCallKey": true,
         "mainnet": true,
         "testnet": true
       },
