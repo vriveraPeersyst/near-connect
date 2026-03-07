@@ -21,7 +21,6 @@ import type { WalletPlugin } from "./types/plugin";
 import { ParentFrameWallet } from "./ParentFrameWallet";
 import { InjectedWallet } from "./InjectedWallet";
 import { SandboxWallet } from "./SandboxedWallet";
-import { parseNearAmount } from "@near-js/utils";
 
 interface NearConnectorOptions {
   providers?: { mainnet?: string[]; testnet?: string[] };
@@ -61,9 +60,11 @@ function createFilterForWalletFeatures(features: Partial<WalletFeatures>) {
   return (wallet: NearWalletBase) => {
     if (Object.entries(features).length === 0) return true;
 
-    return Object.entries(features).filter(([_, value]) => value === true).every(([key]) => {
-      return wallet.manifest.features?.[key as keyof WalletFeatures] === true;
-    });
+    return Object.entries(features)
+      .filter(([_, value]) => value === true)
+      .every(([key]) => {
+        return wallet.manifest.features?.[key as keyof WalletFeatures] === true;
+      });
   };
 }
 
@@ -287,10 +288,10 @@ export class NearConnector {
         addFunctionCallKey = {
           ...input.addFunctionCallKey,
           gasAllowance: input.addFunctionCallKey.gasAllowance ?? {
+            amount: "250000000000000000000000", // 0.25 NEAR in yoctoNEAR
             kind: "limited",
-            amount: parseNearAmount("0.25")!, // 0.25 NEAR in yoctoNEAR
           },
-        }
+        };
       }
 
       if (signMessageParams != null) {

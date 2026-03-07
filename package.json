@@ -1,6 +1,6 @@
 {
   "name": "@hot-labs/near-connect",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "type": "commonjs",
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
@@ -26,9 +26,6 @@
     "cdn": "yarn pre-build && vite build",
     "type-check": "tsc --noEmit",
     "type-check-all": "yarn run type-check && cd example && yarn run type-check && cd ../near-wallets && yarn run type-check"
-  },
-  "dependencies": {
-    "@near-js/utils": "^2.2.4"
   },
   "devDependencies": {
     "@near-js/transactions": "^2.5.1",

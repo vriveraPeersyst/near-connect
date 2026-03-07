@@ -1,4 +1,4 @@
-import { NEAR_CONNECT_VERSION } from "../near_connect_static";
+import { NEAR_CONNECT_VERSION } from "../nearConnectStatic";
 import SandboxExecutor from "./executor";
 
 async function getIframeCode(args: { id: string; executor: SandboxExecutor; code: string }) {
