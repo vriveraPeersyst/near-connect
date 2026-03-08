@@ -159,6 +159,7 @@
       "features": {
         "signMessage": true,
         "signInWithoutAddKey": true,
+        "signInWithFunctionCallKey": true,
         "signAndSendTransaction": true,
         "signAndSendTransactions": true
       },
@@ -196,6 +197,7 @@
       "features": {
         "signMessage": true,
         "signInWithoutAddKey": true,
+        "signInWithFunctionCallKey": true,
         "signAndSendTransaction": true,
         "signAndSendTransactions": true
       }
@@ -213,6 +215,8 @@
       "features": {
         "signMessage": true,
         "signInWithoutAddKey": true,
+        "signInAndSignMessage": true,
+        "signInWithFunctionCallKey": true,
         "signAndSendTransaction": true,
         "signAndSendTransactions": true,
         "testnet": true
@@ -248,6 +252,7 @@
       "features": {
         "signMessage": true,
         "signInWithoutAddKey": true,
+        "signInWithFunctionCallKey": true,
         "signAndSendTransaction": true,
         "signAndSendTransactions": true,
         "testnet": true
@@ -271,6 +276,7 @@
       "features": {
         "signMessage": true,
         "signInWithoutAddKey": true,
+        "signInWithFunctionCallKey": true,
         "signAndSendTransaction": true,
         "signAndSendTransactions": true,
         "testnet": true
@@ -298,6 +304,7 @@
       "features": {
         "signMessage": true,
         "signInWithoutAddKey": true,
+        "signInWithFunctionCallKey": true,
         "signAndSendTransaction": true,
         "signAndSendTransactions": true,
         "testnet": true

@@ -4,6 +4,7 @@ import { Signer } from "@near-js/signers";
 
 import { ConnectorAction } from "../utils/action";
 import { signAndSendTransactionsHandler } from "./helper";
+import type { SignInParams } from "../utils/types";
 
 const networks: Record<string, any> = {
   mainnet: {
@@ -71,10 +72,14 @@ const Nightly = async () => {
   };
 
   return {
-    async signIn({ contractId, methodNames }: { contractId?: string; methodNames?: Array<string> }) {
+    async signIn({ addFunctionCallKey }: SignInParams) {
       await checkExist();
       const existingAccounts = await getAccounts();
       if (existingAccounts.length) return existingAccounts;
+      const contractId = addFunctionCallKey?.contractId;
+      const methodNames = addFunctionCallKey?.allowMethods?.anyMethod === false
+        ? addFunctionCallKey.allowMethods.methodNames
+        : undefined;
       await window.selector.external("nightly.near", "connect", { contractId, methodNames });
       return getAccounts();
     },

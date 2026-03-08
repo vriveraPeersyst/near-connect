@@ -3,6 +3,7 @@ import type { Transaction } from "@near-js/transactions";
 import type { AccessKeyViewRaw, FinalExecutionOutcome } from "@near-js/types";
 import { NearRpc } from "./utils/rpc";
 import { ConnectorAction, connectorActionsToNearApiJsActions } from "./utils/action";
+import type { SignInParams } from "./utils/types";
 import * as nearAPI from "near-api-js";
 
 const { transactions: nearApiTransactions, utils: nearApiUtils } = nearAPI;
@@ -279,7 +280,7 @@ const WalletConnect = async () => {
   };
 
   return {
-    async signIn({ network }: any) {
+    async signIn({ network }: SignInParams) {
       try {
         if (await window.selector.walletConnect.getSession()) await disconnect();
         await connect(network);

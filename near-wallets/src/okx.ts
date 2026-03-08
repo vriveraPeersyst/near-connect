@@ -3,6 +3,7 @@ import { SignedTransaction } from "@near-js/transactions";
 import { isCurrentBrowserSupported } from "./utils/detectBrowser";
 import { connectorActionsToNearActions, ConnectorAction, FunctionCallAction } from "./utils/action";
 import { NearRpc } from "./utils/rpc";
+import type { SignInParams } from "./utils/types";
 
 const checkExist = async () => {
   try {
@@ -43,12 +44,16 @@ const OKXWallet = async () => {
   };
 
   return {
-    async signIn({ contractId, methodNames }: { contractId: string; methodNames: Array<string> }) {
+    async signIn({ addFunctionCallKey }: SignInParams) {
       try {
         await checkExist();
-        const { accessKey, accountId } = await okx("requestSignIn", { contractId: contractId || "", methodNames });
-        const publicKey = accessKey?.publicKey;
-        return [{ accountId, publicKey: publicKey ? publicKey.toString() : undefined }];
+        const contractId = addFunctionCallKey?.contractId || "";
+        const methodNames = addFunctionCallKey?.allowMethods?.anyMethod === false
+          ? addFunctionCallKey.allowMethods.methodNames
+          : undefined;
+        const { accessKey, accountId } = await okx("requestSignIn", { contractId, methodNames });
+        const respPublicKey = accessKey?.publicKey;
+        return [{ accountId, publicKey: respPublicKey ? respPublicKey.toString() : undefined }];
       } catch (_) {
         await signOut();
         throw new Error("Failed to sign in");
