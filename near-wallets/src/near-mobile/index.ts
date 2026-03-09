@@ -1,4 +1,5 @@
 import { NearMobileWallet } from "@peersyst/near-mobile-signer/dist/src/wallet/NearMobileWallet";
+import { NearMobileSignerProxy } from "@peersyst/near-mobile-signer/dist/src/wallet/providers/NearMobileSignerProxy";
 import { RepositoryErrorCodes } from "@peersyst/near-mobile-signer/src/data-access/errors/index";
 import { Network, SessionState } from "@peersyst/near-mobile-signer/src/common/models";
 import { NearMobileStrategy } from "@peersyst/near-mobile-signer/dist/src/wallet/NearMobileWallet.types";
@@ -8,6 +9,7 @@ import { KeyPair } from "@near-js/crypto";
 
 import { nearMobileFrame, nearMobileFrameHead } from "./view";
 import { ConnectorAction } from "../utils/action";
+import type { SignInParams, SignInAndSignMessageParams, AddFunctionCallKeyParams, AccountWithSignedMessage } from "../utils/types";
 
 const isMobile = function () {
   let check = false;
@@ -163,28 +165,144 @@ export const initNearMobileWallet = async () => {
     testnet: new NearMobileWallet({ network: "testnet", sessionRepository: new SessionRepository() as any }),
   };
 
+  const widgetStrategy = new WidgetStrategy();
+  // @ts-ignore - override private defaultStrategy to use our WidgetStrategy
+  wallet.mainnet.defaultStrategy = widgetStrategy;
   // @ts-ignore
-  wallet.mainnet.defaultStrategy = new WidgetStrategy();
-  // @ts-ignore
-  wallet.testnet.defaultStrategy = new WidgetStrategy();
+  wallet.testnet.defaultStrategy = widgetStrategy;
+
+  const signerProxy = new NearMobileSignerProxy();
+
+  const sessionRepo: Record<Network, SessionRepository> = {
+    // @ts-ignore - access private sessionRepository set during construction
+    mainnet: wallet.mainnet.sessionRepository,
+    // @ts-ignore
+    testnet: wallet.testnet.sessionRepository,
+  };
+
+  function buildAddKeyTransaction(addFunctionCallKey: AddFunctionCallKeyParams) {
+    const methodNames = addFunctionCallKey.allowMethods.anyMethod === false
+      ? addFunctionCallKey.allowMethods.methodNames
+      : [];
+
+    let allowance: string | undefined;
+    if (addFunctionCallKey.gasAllowance) {
+      allowance = addFunctionCallKey.gasAllowance.kind === "limited"
+        ? addFunctionCallKey.gasAllowance.amount
+        : undefined;
+    }
+
+    return [{
+      actions: [{
+        type: "AddKey" as const,
+        params: {
+          publicKey: addFunctionCallKey.publicKey,
+          accessKey: {
+            permission: {
+              receiverId: addFunctionCallKey.contractId,
+              methodNames,
+              allowance,
+            },
+          },
+        },
+      }],
+    }];
+  }
+
+  async function signInWithMessage(network: Network): Promise<{ accountId: string; publicKey: string }> {
+    const nonce = Array.from(crypto.getRandomValues(new Uint8Array(32)));
+    const { id } = await signerProxy.createSignMessage(network, "Sign In", window.location?.hostname ?? "", nonce);
+    const handleClose = async () => await signerProxy.rejectMessageRequest(id);
+    widgetStrategy.onRequested(id, { network, message: "Sign In", receiver: "", nonce }, handleClose);
+
+    const { status, response } = await signerProxy.awaitMessageSignatureResolution(id);
+    if (status === "rejected" || !response) {
+      throw new Error("Sign in rejected");
+    }
+
+    const { accountId, publicKey } = response;
+    if (!accountId) throw new Error("Request not signed");
+
+    const dummyKey = KeyPair.fromRandom("ed25519");
+    await sessionRepo[network].setKey(network, accountId, dummyKey);
+    await sessionRepo[network].setActiveAccount(network, accountId);
+
+    return { accountId, publicKey: publicKey ?? "" };
+  }
+
+  async function signInWithAddKey(network: Network, addFunctionCallKey: AddFunctionCallKeyParams): Promise<{ accountId: string; publicKey: string }> {
+    const transactions = buildAddKeyTransaction(addFunctionCallKey);
+
+    const { id, network: respNetwork, requests } = await signerProxy.createRequest(network, transactions);
+    const handleClose = async () => await signerProxy.rejectSignerRequest(id);
+    widgetStrategy.onRequested(id, { network: respNetwork as Network, request: requests }, handleClose);
+
+    const { status } = await signerProxy.awaitActionSignatureResolution(id);
+    if (status === "rejected") {
+      throw new Error("Sign in rejected");
+    }
+
+    const { signerAccountId } = await signerProxy.getRequest(id);
+    if (!signerAccountId) throw new Error("Request not signed");
+
+    const dummyKey = KeyPair.fromRandom("ed25519");
+    await sessionRepo[network].setKey(network, signerAccountId, dummyKey);
+    await sessionRepo[network].setActiveAccount(network, signerAccountId);
+
+    return { accountId: signerAccountId, publicKey: addFunctionCallKey.publicKey };
+  }
 
   async function getAccounts(network: Network) {
     const accountIds = await wallet[network].getAccounts();
     const accounts: { accountId: string; publicKey: string }[] = [];
 
     for (let i = 0; i < accountIds.length; i++) {
-      const publicKey = await wallet[network].signer.getPublicKey(accountIds[i], network);
-      accounts.push({ accountId: accountIds[i], publicKey: publicKey.toString() });
+      try {
+        const publicKey = await wallet[network].signer.getPublicKey(accountIds[i], network);
+        accounts.push({ accountId: accountIds[i], publicKey: publicKey.toString() });
+      } catch {
+        accounts.push({ accountId: accountIds[i], publicKey: "" });
+      }
     }
 
     return accounts;
   }
 
   return {
-    async signIn(data: { network: Network; contractId?: string; methodNames?: Array<string> }) {
+    async signIn(data: SignInParams) {
       window.selector.ui.showIframe();
-      await wallet[data.network].signIn({ contractId: data.contractId, methodNames: data.methodNames });
-      return await getAccounts(data.network);
+      const result = data.addFunctionCallKey
+        ? await signInWithAddKey(data.network, data.addFunctionCallKey)
+        : await signInWithMessage(data.network);
+      return [result];
+    },
+
+    async signInAndSignMessage(data: SignInAndSignMessageParams): Promise<AccountWithSignedMessage[]> {
+      window.selector.ui.showIframe();
+      const { messageParams, network } = data;
+      const nonce = Array.from(messageParams.nonce);
+
+      const { id } = await signerProxy.createSignMessage(network, messageParams.message, messageParams.recipient, nonce);
+      const handleClose = async () => await signerProxy.rejectMessageRequest(id);
+      widgetStrategy.onRequested(id, { network, message: messageParams.message, receiver: messageParams.recipient, nonce }, handleClose);
+
+      const { status, response } = await signerProxy.awaitMessageSignatureResolution(id);
+      if (status === "rejected" || !response) {
+        throw new Error("Sign in rejected");
+      }
+
+      const { accountId, publicKey, signature } = response;
+      if (!accountId) throw new Error("Request not signed");
+
+      const dummyKey = KeyPair.fromRandom("ed25519");
+      await sessionRepo[network].setKey(network, accountId, dummyKey);
+      await sessionRepo[network].setActiveAccount(network, accountId);
+
+      return [{
+        accountId,
+        publicKey: publicKey ?? "",
+        signedMessage: { accountId, publicKey: publicKey ?? "", signature: signature ?? "" },
+      }];
     },
 
     async signOut({ network }: { network: Network }) {
