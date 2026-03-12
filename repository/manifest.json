@@ -232,7 +232,7 @@
       "permissions": {
         "storage": true,
         "location": true,
-        "allowsOpen": ["https://nearmobile.app", "https://play.google.com", "https://apps.apple.com"]
+        "allowsOpen": ["https://nearmobile.app", "https://play.google.com", "https://apps.apple.com", "https://near-mobile-production.aws.peersyst.tech"]
       }
     },
     {
